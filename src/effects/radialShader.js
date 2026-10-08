@@ -1,6 +1,9 @@
+import Clutter from 'gi://Clutter'
 import Shell from 'gi://Shell'
 import GObject from 'gi://GObject'
 import Cogl from 'gi://Cogl'
+
+const LegacyShaderEffect = Shell.GLSLEffect;
 
 const VIGNETTE_DECLARATIONS = '                                              \
 uniform float brightness;                                                  \n\
@@ -29,22 +32,32 @@ export const MyRadialShaderEffect = GObject.registerClass({
             GObject.ParamFlags.READWRITE,
             0, 1, 0),
     },
-}, class MyRadialShaderEffect extends Shell.GLSLEffect {
+}, class MyRadialShaderEffect extends (LegacyShaderEffect ?? Clutter.ShaderEffect) {
     constructor(params) {
         super(params);
         this._brightness = undefined;
         this._sharpness = undefined;
 
-        this._brightnessLocation = this.get_uniform_location('brightness');
-        this._sharpnessLocation = this.get_uniform_location('vignette_sharpness');
+        if (LegacyShaderEffect) {
+            this._brightnessLocation = this.get_uniform_location('brightness');
+            this._sharpnessLocation = this.get_uniform_location('vignette_sharpness');
+        }
 
         this.brightness = 1.0;
         this.sharpness = 0.0;
     }
 
-    vfunc_build_pipeline() {
-        this.add_glsl_snippet(Cogl.SnippetHook.FRAGMENT,
-            VIGNETTE_DECLARATIONS, VIGNETTE_CODE, true);
+    [LegacyShaderEffect ? 'vfunc_build_pipeline' : 'vfunc_get_static_snippet']() {
+        if (LegacyShaderEffect) {
+            this.add_glsl_snippet(Cogl.SnippetHook.FRAGMENT,
+                VIGNETTE_DECLARATIONS, VIGNETTE_CODE, true);
+            return;
+        }
+
+        const snippet = Cogl.Snippet.new(Cogl.SnippetHook.FRAGMENT,
+            VIGNETTE_DECLARATIONS, null);
+        snippet.set_replace(VIGNETTE_CODE);
+        return snippet;
     }
 
     get brightness() {
@@ -55,8 +68,10 @@ export const MyRadialShaderEffect = GObject.registerClass({
         if (this._brightness === v)
             return;
         this._brightness = v;
-        this.set_uniform_float(this._brightnessLocation,
-            1, [this._brightness]);
+        if (LegacyShaderEffect)
+            this.set_uniform_float(this._brightnessLocation, 1, [this._brightness]);
+        else
+            this.set_uniform_float('brightness', 1, [this._brightness]);
         this.notify('brightness');
     }
 
@@ -68,8 +83,10 @@ export const MyRadialShaderEffect = GObject.registerClass({
         if (this._sharpness === v)
             return;
         this._sharpness = v;
-        this.set_uniform_float(this._sharpnessLocation,
-            1, [this._sharpness]);
+        if (LegacyShaderEffect)
+            this.set_uniform_float(this._sharpnessLocation, 1, [this._sharpness]);
+        else
+            this.set_uniform_float('vignette_sharpness', 1, [this._sharpness]);
         this.notify('sharpness');
     }
 });

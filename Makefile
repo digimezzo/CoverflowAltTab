@@ -36,11 +36,11 @@ MO_FILES := $(PO_FILES:.po=.mo)
 SCHEMA_DIR = ./schemas
 SCHEMA_FILE = org.gnome.shell.extensions.coverflowalttab.gschema.xml
 
-.PHONY: $(POT_FILE) build
+.PHONY: $(POT_FILE) build schema
 
 all: build schema install
 
-build:
+build: schema
 	mkdir -p build
 	cd src && gnome-extensions pack -f \
 		--extra-source ./coverflowSwitcher.js \
@@ -62,6 +62,8 @@ build:
 		--schema ../schemas/org.gnome.shell.extensions.coverflowalttab.gschema.xml \
 		--podir ../locale/ \
 		-o ../build/
+	mv -f build/$(UUID).shell-extension.zip build/$(UUID).zip
+	zip build/$(UUID).zip schemas/gschemas.compiled
 
 $(POT_FILE): $(SRC_DIR)/*.js
 	xgettext ${SRC_DIR}/*.js -L JavaScript --from-code=UTF-8 -o $@ --package-name=${UUID}
@@ -78,7 +80,7 @@ mergepo: $(POT_FILE)
 	done;
 
 install: build
-	gnome-extensions install -f build/${UUID}.shell-extension.zip
+	gnome-extensions install -f build/${UUID}.zip
 
 uninstall:
 	gnome-extensions uninstall ${UUID}
